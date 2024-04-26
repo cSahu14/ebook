@@ -5,6 +5,7 @@ import createHttpError from "http-errors";
 import bookModel from "./bookModel";
 import fs from "node:fs";
 import { AuthRequest } from "../middlewares/authenticate";
+import { Book } from "./bookTypes";
 
 const createBook = async (req: Request, res: Response, next: NextFunction) => {
   const { title, genre } = req.body;
@@ -179,4 +180,45 @@ const singleBook = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
-export { createBook, updateBook, listBooks, singleBook };
+const deleteBook = async (req: Request, res: Response, next: NextFunction) => {
+  const bookId = req.params.bookId;
+  let book: Book | null;
+  try {
+    book = await bookModel.findOne({ _id: bookId });
+    if (!book) {
+      return next(createHttpError(404, "Book not found."));
+    }
+  } catch (error) {
+    return next(createHttpError(500, "Error while getting book."));
+  }
+
+  // Check access
+  const _req = req as AuthRequest;
+  if (book.author.toString() !== _req.userId) {
+    return next(createHttpError(403, "You can't delete other book."));
+  }
+
+  try {
+    const coverImageSplit = book.coverImage.split("/");
+    const coverImageId = `${coverImageSplit.at(-2)}/${coverImageSplit
+      .at(-1)
+      ?.split(".")
+      .at(-2)}`;
+
+    const bookFileSplit = book.file.split("/");
+    const bookFileId = `${bookFileSplit.at(-2)}/${bookFileSplit.at(-1)}`;
+
+    await cloudinary.uploader.destroy(coverImageId);
+    await cloudinary.uploader.destroy(bookFileId, {
+      resource_type: "raw",
+    });
+
+    await bookModel.deleteOne({ _id: bookId });
+
+    return res.sendStatus(204);
+  } catch (error) {
+    return next(createHttpError(500, "Error while delete book."));
+  }
+};
+
+export { createBook, updateBook, listBooks, singleBook, deleteBook };

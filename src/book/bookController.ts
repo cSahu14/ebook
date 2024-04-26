@@ -12,6 +12,7 @@ const createBook = async (req: Request, res: Response, next: NextFunction) => {
 
   try {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    console.log("files", files);
     const coverImageMimeType = files.coverImage[0].mimetype.split("/").at(-1);
     const fileName = files.coverImage[0].filename;
     const filePath = path.resolve(
@@ -87,6 +88,8 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
   if (book.author.toString() !== _req.userId) {
     return next(createHttpError(403, "You cannot update others book."));
   }
+
+  // destroy previous files from cloudinary
 
   const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
